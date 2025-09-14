@@ -1,0 +1,17 @@
+FROM oven/bun:1 AS base
+WORKDIR ./
+
+COPY package.json package-lock.json* bun.lockb* ./
+RUN bun install
+
+COPY . .
+
+RUN bunx prisma generate
+
+RUN test -f tsconfig.json && bun run build || echo "No build step"
+
+EXPOSE 3000
+
+ENV NODE_ENV=production
+
+CMD ["bun", "run", "dev"]

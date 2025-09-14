@@ -7,13 +7,17 @@ dotenv.config();
 
 export async function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
     const JWT_SECRET = process.env.JWT_SECRET || "";
-    const token = req.headers["authorization"];
-    if (!token) return res.status(401).send("Missing token");
+    const header = req.headers["authorization"]; 
+    if (!header) return res.status(401).send("Missing Authorization header");
+    const parts = header.split(' ');
+    if(parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).send('Malformed Authorization header');
+    const token = parts[1];
     try {
-        const decoded = jwt.decode(token, JWT_SECRET) as JwtPayload;
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
         req.user = decoded;
         next();
-    } catch (e) {
+    } catch (e:any) {
+        if(e.name === 'TokenExpiredError') return res.status(401).send('Token expired');
         console.error(e);
         res.status(401).send("Invalid token");
     }
