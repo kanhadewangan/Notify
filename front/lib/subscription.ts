@@ -5,14 +5,17 @@ export function canCreateNote(user: User): boolean {
   if (user.subscription === "pro") return true
 
   const limit = SUBSCRIPTION_LIMITS.free.maxNotes
-  return user.notes.length < limit
+  const currentNotes = user.notes?.length || 0
+  return currentNotes < limit
 }
 
 export function getRemainingNotes(user: User): number {
-  if (user.subscription === "pro") return -1 // unlimited
+  if (user.subscription === "pro") return -1 
 
   const limit = SUBSCRIPTION_LIMITS.free.maxNotes
-  return Math.max(0, limit - user.notes.length)
+  if (!limit) return 0
+  const currentNotes = user.notes?.length || 0
+  return Math.max(0, limit - currentNotes)
 }
 
 export function getSubscriptionFeatures(subscription: "free" | "pro"): string[] {

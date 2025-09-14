@@ -14,8 +14,8 @@ interface UsageIndicatorProps {
 export function UsageIndicator({ user, className }: UsageIndicatorProps) {
   const remaining = getRemainingNotes(user)
   const isUnlimited = user.subscription === "pro"
-  const notesCount = user.notes.length
-  const maxNotes = 3 // free tier limit
+  const notesCount = user.notes?.length || 0
+  const maxNotes = 3 
 
   if (isUnlimited) {
     return (

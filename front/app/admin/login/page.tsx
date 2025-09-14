@@ -8,12 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Sparkles, Eye, EyeOff } from "lucide-react"
+import { Shield, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import axios from "axios"
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -21,43 +21,43 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
 
     try {
-      const response = await axios.post("https://back-27ic.vercel.app/api/user/login", { email, password })
+      const response = await axios.post("https://back-27ic.vercel.app/api/admin/login", { email, password })
       console.log(response.data.token)
-      localStorage.setItem("authorization", JSON.stringify(response.data.token))
-      router.push("/notes")
+      localStorage.setItem("admin_authorization", response.data.token)
+      router.push("/admin")
     } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid email or password")
+      setError(err.response?.data?.message || "Invalid admin credentials")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-red-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
+            <Shield className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold text-slate-900">NoteMaster</span>
+          <span className="text-xl font-bold text-slate-900">Admin Panel</span>
         </div>
 
         <Card className="border-slate-200 shadow-lg">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-slate-900">Welcome back</CardTitle>
+            <CardTitle className="text-2xl font-bold text-slate-900">Admin Login</CardTitle>
             <CardDescription className="text-slate-600">
-              Sign in to your account to continue taking notes
+              Access the admin dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleAdminLogin} className="space-y-4">
               {error && (
                 <Alert className="border-red-200 bg-red-50">
                   <AlertDescription className="text-red-700">{error}</AlertDescription>
@@ -66,16 +66,16 @@ export default function LoginPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-slate-700">
-                  Email
+                  Admin Email
                 </Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="Enter admin email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="border-slate-300 focus:border-blue-500"
+                  className="border-slate-300 focus:border-red-500"
                 />
               </div>
 
@@ -87,11 +87,11 @@ export default function LoginPage() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
+                    placeholder="Enter admin password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="border-slate-300 focus:border-blue-500 pr-10"
+                    className="border-slate-300 focus:border-red-500 pr-10"
                   />
                   <button
                     type="button"
@@ -103,16 +103,22 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign In"}
+              <Button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={isLoading}>
+                {isLoading ? "Signing in..." : "Admin Sign In"}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-2">
               <p className="text-slate-600">
-                Don't have an account?{" "}
-                <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Sign up
+                Don't have an admin account?{" "}
+                <Link href="/admin/register" className="text-red-600 hover:text-red-700 font-medium">
+                  Register as Admin
+                </Link>
+              </p>
+              <p className="text-slate-600">
+                Back to user login?{" "}
+                <Link href="/login" className="text-red-600 hover:text-red-700 font-medium">
+                  User Login
                 </Link>
               </p>
             </div>

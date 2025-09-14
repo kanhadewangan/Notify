@@ -16,15 +16,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Plus, Search, Edit, Trash2, LogOut, Sparkles, Crown } from "lucide-react"
-import { getCurrentUser, updateCurrentUser, logout } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import type { User, Note } from "@/lib/types" // Renamed import to avoid redeclaration
-import { canCreateNote, getRemainingNotes } from "@/lib/subscription"
+import type { Note } from "@/lib/types"
 import { UsageIndicator } from "@/components/usage-indicator"
-
+import axios from "axios"
 export default function NotesPage() {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<any>(null)
   const [notes, setNotes] = useState<Note[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -32,16 +30,40 @@ export default function NotesPage() {
   const [newNote, setNewNote] = useState({ title: "", content: "" })
   const [error, setError] = useState("")
   const router = useRouter()
+  
 
   useEffect(() => {
-    const currentUser = getCurrentUser()
-    if (!currentUser) {
+    const token = localStorage.getItem("authorization")
+    console.log(token)
+    if (!token) {
       router.push("/login")
       return
     }
-    setUser(currentUser)
-    setNotes(currentUser.notes || [])
+    fetchUserAndNotes()
   }, [router])
+
+  const fetchUserAndNotes = async () => {
+    try {
+      const token = JSON.parse(localStorage.getItem("authorization") || '""')
+      const response = await axios.get("https://back-27ic.vercel.app/api/note/notes", {
+        headers: {
+          Authorization: token
+        }
+      })
+      setNotes(response.data.notes || [])
+      // Set basic user info if available in response
+      if (response.data.user) {
+        setUser(response.data.user)
+      } else {
+        // Set default user info
+        setUser({ subscription: "free", name: "User" })
+      }
+    } catch (error) {
+      console.error("Failed to fetch notes:", error)
+      // Redirect to login if unauthorized
+      router.push("/login")
+    }
+  }
 
   const filteredNotes = notes.filter(
     (note) =>
@@ -49,11 +71,11 @@ export default function NotesPage() {
       note.content.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const canCreate = user ? canCreateNote(user) : false
-  const remaining = user ? getRemainingNotes(user) : 0
+  const canCreate = user ? (user.subscription === "pro" ? true : notes.length < 3) : false
+  const remaining = user ? (user.subscription === "pro" ? Infinity : Math.max(0, 3 - notes.length)) : 0
 
-  const handleCreateNote = () => {
-    if (!user || !canCreate) {
+  const handleCreateNote = async () => {
+    if (!canCreate) {
       setError("You've reached the limit of 3 notes. Upgrade to Pro for unlimited notes!")
       return
     }
@@ -63,23 +85,27 @@ export default function NotesPage() {
       return
     }
 
-    const note: Note = {
-      id: Date.now().toString(),
-      title: newNote.title.trim(),
-      content: newNote.content.trim(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    try {
+      const token = JSON.parse(localStorage.getItem("authorization") || '""')
+      const response = await axios.post("https://back-27ic.vercel.app/api/note", {
+        title: newNote.title.trim(),
+        content: newNote.content.trim(),
+      }, {
+        headers: {
+          Authorization: token
+        }
+      })
+
+      // Add the new note to the local state
+      const newNoteData = response.data.note
+      setNotes(prevNotes => [...prevNotes, newNoteData])
+      setNewNote({ title: "", content: "" })
+      setIsCreateDialogOpen(false)
+      setError("")
+    } catch (error: any) {
+      console.error("Failed to create note:", error)
+      setError(error.response?.data?.message || "Failed to create note")
     }
-
-    const updatedNotes = [...notes, note]
-    const updatedUser = { ...user, notes: updatedNotes }
-
-    setNotes(updatedNotes)
-    setUser(updatedUser)
-    updateCurrentUser(updatedUser)
-    setNewNote({ title: "", content: "" })
-    setIsCreateDialogOpen(false)
-    setError("")
   }
 
   const handleEditNote = (note: Note) => {
@@ -87,48 +113,57 @@ export default function NotesPage() {
     setNewNote({ title: note.title, content: note.content })
   }
 
-  const handleUpdateNote = () => {
-    if (!user || !editingNote) return
+  const handleUpdateNote = async () => {
+    if (!editingNote) return
 
     if (!newNote.title.trim()) {
       setError("Please enter a title for your note")
       return
     }
 
-    const updatedNotes = notes.map((note) =>
-      note.id === editingNote.id
-        ? {
-            ...note,
-            title: newNote.title.trim(),
-            content: newNote.content.trim(),
-            updatedAt: new Date().toISOString(),
-          }
-        : note,
-    )
+    try {
+      const token = JSON.parse(localStorage.getItem("authorization") || '""')
+      const response = await axios.put(`https://back-27ic.vercel.app/api/note/notes/${editingNote.id}`, {
+        title: newNote.title.trim(),
+        content: newNote.content.trim(),
+      }, {
+        headers: {
+          Authorization: token
+        }
+      })
 
-    const updatedUser = { ...user, notes: updatedNotes }
-
-    setNotes(updatedNotes)
-    setUser(updatedUser)
-    updateCurrentUser(updatedUser)
-    setEditingNote(null)
-    setNewNote({ title: "", content: "" })
-    setError("")
+      // Update the note in local state
+      const updatedNote = response.data.note
+      setNotes(prevNotes => prevNotes.map(note =>
+        note.id === editingNote.id ? updatedNote : note
+      ))
+      setEditingNote(null)
+      setNewNote({ title: "", content: "" })
+      setError("")
+    } catch (error: any) {
+      console.error("Failed to update note:", error)
+      setError(error.response?.data?.message || "Failed to update note")
+    }
   }
 
-  const handleDeleteNote = (noteId: string) => {
-    if (!user) return
+  const handleDeleteNote = async (noteId: string) => {
+    try {
+      const token = JSON.parse(localStorage.getItem("authorization") || '""')
+      await axios.delete(`https://back-27ic.vercel.app/api/note/notes/${noteId}`, {
+        headers: {
+          Authorization: token
+        }
+      })
 
-    const updatedNotes = notes.filter((note) => note.id !== noteId)
-    const updatedUser = { ...user, notes: updatedNotes }
-
-    setNotes(updatedNotes)
-    setUser(updatedUser)
-    updateCurrentUser(updatedUser)
+      setNotes(prevNotes => prevNotes.filter(note => note.id !== noteId))
+    } catch (error: any) {
+      console.error("Failed to delete note:", error)
+      setError(error.response?.data?.message || "Failed to delete note")
+    }
   }
 
   const handleLogout = () => {
-    logout()
+    localStorage.removeItem("authorization")
     router.push("/")
   }
 
@@ -316,7 +351,11 @@ export default function NotesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDeleteNote(note.id)}
+                      onClick={() => {handleDeleteNote(note.id)
+                        console.log("Deleting note with id:", note.id)
+                      }
+                        
+                      }
                       className="border-red-200 text-red-600 hover:bg-red-50"
                     >
                       <Trash2 className="w-3 h-3" />
