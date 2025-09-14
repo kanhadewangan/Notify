@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { PrismaClient } from '../db/generated/prisma';
+import { authMiddleware } from '../middleware/middleware';
 
 
 const router = express.Router();
@@ -88,12 +89,20 @@ router.post('/refresh', async (req,res)=>{
     }
 });
 
-router.get("/profile", async (req, res) => {
+router.get("/profile", authMiddleware, async (req, res) => {
     try {
-        const headers = req.headers["authorization"]
-        if (!headers) return res.status(401).send("Missing Authorization header");
-        const decode = jwt.decode(headers, JWT_SECRET) as JwtPayload;
-        res.status(200).json({profile:decode});
+        if (!req.user || typeof req.user === 'string') {
+            res.status(401).send("Unauthorized");
+            return
+        }
+       const userId = req.user.id;
+        try {
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            if (!user) throw new Error("User not found");
+            res.status(200).json({ profile: user });
+        } catch {
+            return res.status(401).send("Invalid or expired token");
+        }
     }
     catch(e){
         console.error(e);

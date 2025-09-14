@@ -1,6 +1,7 @@
 import express from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { PrismaClient } from '../db/generated/prisma';
+import { authMiddleware } from "../middleware/middleware";
 
 
 const router = express.Router();
@@ -13,14 +14,13 @@ router.get("/health", (req, res) => {
 );
 
 // Placeholder for payment processing logic
-router.post("/process", async (req, res) => {
+router.post("/subscription", authMiddleware, async (req, res) => {
     try {
-        const headers = req.headers["authorization"];
-        if (!headers) return res.status(401).send("Missing Authorization header");
-        const decode = jwt.decode(headers, JWT_SECRET) as JwtPayload;
-        if (!decode) return res.status(401).send("Invalid Token");
-        const userId = decode.id;
-
+        if (!req.user || typeof req.user === 'string') {
+            res.status(401).send("Unauthorized");
+            return
+        }
+        const userId = req.user.id;
         const { amount, subscriptio_typen , payment_method } = req.body;
         if (!amount || !subscriptio_typen) {
             return res.status(400).send("Missing amount or subscription type");
@@ -42,4 +42,29 @@ router.post("/process", async (req, res) => {
         res.status(500).send("Failed to process payment");
     }
 });
-export default router;
+
+router.get("/user/:id/payments", async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        if (isNaN(userId)) {
+            return res.status(400).send("Invalid user ID");
+        }
+        const payments = await prisma.subsription.findMany({
+            where: {
+                userId: userId,
+            },
+        });
+        if(payments.length === 0){
+             res.status(404).send("No payments found for this user");
+                return;
+        }
+        res.status(200).json(payments);
+    } catch (e) {
+        console.error(e);
+        res.status(500).send("Failed to retrieve payments");
+    }
+});
+
+
+const payment = router;
+export default payment;
